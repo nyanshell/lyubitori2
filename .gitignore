@@ -1,0 +1,10 @@
+venv/
+*.png
+*.log
+.env
+downloaded/
+test.py
+*.jpg
+*.jpeg
+selenium/
+cookies.json
