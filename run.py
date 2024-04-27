@@ -43,7 +43,7 @@ SAVE_PATH = 'downloaded'
 USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
 BACKUP_CODE = os.getenv("BACKUP_CODE")
-FRONT_PAGE = 'https://twitter.com'
+FRONT_PAGE = 'https://twitter.com/i/flow/login'
 
 FETCH_IMG_TEMPLATE = """
 return new Promise((resolve, reject) => {
@@ -62,11 +62,14 @@ return new Promise((resolve, reject) => {
 });
 """
 
-remote_url = 'http://127.0.0.1:9515'
+# remote_url = 'http://127.0.0.1:9515'
 # remote_url = 'http://192.168.0.4:9515'
-driver = webdriver.Remote(
-    remote_url,
+# driver = webdriver.Remote(
+#     remote_url,
     # keep_alive=True,
+#     options=chrome_options,
+# )
+driver = webdriver.Chrome(
     options=chrome_options,
 )
 driver.set_window_size(1920, 1080)
@@ -117,7 +120,11 @@ def download_images(max_error_cnt=3):
             continue
         else:
             last_img = img
-        url = url.replace("format=jpg", "format=png").replace("name=small", "name=large").replace("name=900x900", "name=large")
+        url = url.replace(
+            "format=jpg", "format=png").replace(
+            "format=webp", "format=png").replace(
+            "name=small", "name=large").replace(
+            "name=900x900", "name=large")
         print(f"downloading image url: {url}")
 
         image_name = get_image_name(img, url)
@@ -147,8 +154,12 @@ def is_login():
     raise NotImplementedError()
 
 
-def scroll_download(max_error_cnt=3, max_scroll=1000):
-    # TODO: optimize
+def scroll_download(max_error_cnt=3, max_scroll=1000, from_start=False):
+    # TODO: optimize scroll
+    if from_start:
+        driver.get(os.getenv("FAV_URL"))
+        print('Wait for page loading...')
+        time.sleep(10.0)
     loop = 0
     previous_urls = set()
     while loop < max_scroll:
@@ -183,7 +194,9 @@ def twitter_login(max_error_count=3) -> bool:
     '''
     TODO: support 2-step auth login
     '''
+    print('start login')
     driver.get(FRONT_PAGE)
+    time.sleep(5.0)
     error_count = 0
     while error_count < max_error_count:
         time.sleep(5.0)
@@ -255,6 +268,7 @@ def twitter_login(max_error_count=3) -> bool:
     except NoSuchElementException:
         print("don't need to chose Ads options")
 
+    # TODO: use another element (e.g: username) to check login result
     try:
         driver.find_element(By.XPATH, "//*[text()='Welcome to Twitter!']")
         return True
@@ -281,9 +295,6 @@ def restore_cookies():
 
 
 if __name__ == '__main__':
-    # restore_cookies()
-    driver.get(os.getenv("FAV_URL"))
-    print('Wait for page loading...')
-    time.sleep(10.0)
-    print('Start download...')
-    # download_images()
+    # TODO: detect login status
+    # twitter_login()
+    scroll_download(max_scroll=50, from_start=True)

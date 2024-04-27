@@ -1,2 +1,2 @@
-honcho==1.1.0
-ipython==8.14.0
+ipython>=8.14.0
+python-dotenv[cli]>=1.0.1
