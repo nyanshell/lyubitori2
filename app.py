@@ -12,7 +12,6 @@ from typing import Any
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-from twitter_scraper.auth import TwitterAuth
 from twitter_scraper.config import Config
 from twitter_scraper.driver import DriverManager
 from twitter_scraper.scraper import TwitterImageScraper
@@ -72,7 +71,6 @@ task_lock = threading.Lock()
 # Shared driver components
 driver_manager: DriverManager | None = None
 session_manager = SessionManager(config.session_path)
-auth: TwitterAuth | None = None
 scraper: TwitterImageScraper | None = None
 driver_lock = threading.Lock()
 
@@ -83,16 +81,13 @@ CORS(app)
 
 def ensure_driver() -> bool:
     """Ensure driver and related components are initialized."""
-    global driver_manager, auth, scraper
+    global driver_manager, scraper
 
     try:
         if not driver_manager:
             driver_manager = DriverManager(config)
 
         driver = driver_manager.get_driver()
-
-        if not auth:
-            auth = TwitterAuth(driver, config, session_manager)
 
         if not scraper:
             scraper = TwitterImageScraper(driver, config)
@@ -104,11 +99,11 @@ def ensure_driver() -> bool:
 
 
 def check_authentication() -> bool:
-    """Check if currently authenticated."""
+    """Check if currently authenticated (assumes user is logged in)."""
     try:
         if not ensure_driver():
             return False
-        return auth.is_logged_in()
+        return session_manager.has_saved_session()
     except Exception as e:
         logger.error(f"Authentication check error: {e}")
         return False
@@ -116,12 +111,11 @@ def check_authentication() -> bool:
 
 def cleanup_driver():
     """Clean up driver resources."""
-    global driver_manager, auth, scraper
+    global driver_manager, scraper
 
     if driver_manager:
         driver_manager.quit_driver()
         driver_manager = None
-    auth = None
     scraper = None
 
 
@@ -146,17 +140,14 @@ def run_download_task(task_id: str, debug_mode: bool = False):
         if debug_mode:
             config.enable_debug()
 
-        # Ensure authentication
+        # Ensure driver is ready
         with driver_lock:
             if not ensure_driver():
                 raise Exception("Failed to initialize driver")
 
-            if not auth.login():
-                raise Exception("Authentication failed")
-
-            # Ensure we're on the likes page
-            if not auth.ensure_likes_page():
-                raise Exception("Failed to navigate to likes page")
+            # Navigate to likes page (assuming user is logged in)
+            driver = driver_manager.get_driver()
+            driver.get(config.likes_url)
 
             # Start downloading with progress tracking
             total_images = 0
@@ -236,7 +227,7 @@ def run_download_task(task_id: str, debug_mode: bool = False):
 
 
 # API Routes
-@app.route("/api/status", methods=["GET"])
+@app.route("/status", methods=["GET"])
 def status():
     """Get API and authentication status."""
     try:
@@ -263,40 +254,7 @@ def status():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-@app.route("/api/login", methods=["POST"])
-def login():
-    """Login to Twitter and save session."""
-    try:
-        with driver_lock:
-            if ensure_driver():
-                if auth.login(save_session=True):
-                    return jsonify({"status": "success", "message": "Login successful"})
-                else:
-                    return jsonify({"status": "error", "message": "Login failed"}), 401
-            else:
-                return jsonify(
-                    {"status": "error", "message": "Failed to initialize driver"}
-                ), 500
-    except Exception as e:
-        logger.error(f"Login error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route("/api/logout", methods=["POST"])
-def logout():
-    """Logout and clear session."""
-    try:
-        with driver_lock:
-            if auth:
-                auth.logout()
-            cleanup_driver()
-        return jsonify({"status": "success", "message": "Logged out successfully"})
-    except Exception as e:
-        logger.error(f"Logout error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route("/api/download", methods=["POST"])
+@app.route("/download", methods=["POST"])
 def download():
     """Start a new download task."""
     try:
@@ -341,7 +299,7 @@ def download():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-@app.route("/api/refresh", methods=["POST"])
+@app.route("/refresh", methods=["POST"])
 def refresh():
     """Refresh/restart the current page and download new content."""
     try:
@@ -387,7 +345,7 @@ def refresh():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-@app.route("/api/tasks", methods=["GET"])
+@app.route("/tasks", methods=["GET"])
 def get_tasks():
     """Get all tasks."""
     with task_lock:
@@ -395,7 +353,7 @@ def get_tasks():
     return jsonify({"tasks": tasks_data})
 
 
-@app.route("/api/tasks/<task_id>", methods=["GET"])
+@app.route("/tasks/<task_id>", methods=["GET"])
 def get_task(task_id):
     """Get specific task information."""
     with task_lock:
@@ -405,7 +363,7 @@ def get_task(task_id):
         return jsonify(task.to_dict())
 
 
-@app.route("/api/tasks/<task_id>/cancel", methods=["POST"])
+@app.route("/tasks/<task_id>/cancel", methods=["POST"])
 def cancel_task(task_id):
     """Cancel a running task."""
     with task_lock:
@@ -426,7 +384,8 @@ def cancel_task(task_id):
     return jsonify({"status": "success", "message": "Task cancelled"})
 
 
-@app.route("/api/health", methods=["GET"])
+
+@app.route("/health", methods=["GET"])
 def health():
     """Health check endpoint."""
     return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
@@ -440,15 +399,13 @@ def index():
             "service": "Lyubitori API",
             "version": "1.0.0",
             "endpoints": {
-                "GET /api/status": "Get API status and authentication state",
-                "POST /api/login": "Login to Twitter",
-                "POST /api/logout": "Logout and clear session",
-                "POST /api/download": "Start download task",
-                "POST /api/refresh": "Refresh and download new content",
-                "GET /api/tasks": "Get all tasks",
-                "GET /api/tasks/<id>": "Get specific task",
-                "POST /api/tasks/<id>/cancel": "Cancel task",
-                "GET /api/health": "Health check",
+                "GET /status": "Get API status and authentication state",
+                "POST /download": "Start download task",
+                "POST /refresh": "Refresh and download new content",
+                "GET /tasks": "Get all tasks",
+                "GET /tasks/<id>": "Get specific task",
+                "POST /tasks/<id>/cancel": "Cancel task",
+                "GET /health": "Health check",
             },
         }
     )

@@ -93,37 +93,37 @@ python app.py
 
 #### API Endpoints
 
-- `GET /api/status` - Get authentication and system status
-- `POST /api/login` - Login to Twitter and save session
-- `POST /api/logout` - Logout and clear session
-- `POST /api/download` - Start download task
-- `POST /api/refresh` - Refresh page and download new content
-- `GET /api/tasks` - Get all tasks
-- `GET /api/tasks/<id>` - Get specific task status
-- `POST /api/tasks/<id>/cancel` - Cancel running task
-- `GET /api/health` - Health check
+- `GET /status` - Get authentication and system status
+- `POST /download` - Start download task
+- `POST /refresh` - Refresh page and download new content
+- `GET /tasks` - Get all tasks
+- `GET /tasks/<id>` - Get specific task status
+- `POST /tasks/<id>/cancel` - Cancel running task
+- `GET /health` - Health check
+
+**Note:** Authentication is handled via CLI. Users should login using `python main.py login` before using the API.
 
 #### API Usage Examples
 
 ```bash
 # Check status
-curl http://localhost:5000/api/status
+curl http://localhost:5000/status
 
 # Start download task
-curl -X POST http://localhost:5000/api/download \
+curl -X POST http://localhost:5000/download \
   -H "Content-Type: application/json" \
   -d '{"max_scroll": 100}'
 
 # Start download task with debug mode
-curl -X POST http://localhost:5000/api/download \
+curl -X POST http://localhost:5000/download \
   -H "Content-Type: application/json" \
   -d '{"max_scroll": 100, "debug": true}'
 
 # Check task progress
-curl http://localhost:5000/api/tasks/<task-id>
+curl http://localhost:5000/tasks/<task-id>
 
 # Refresh and download new content
-curl -X POST http://localhost:5000/api/refresh \
+curl -X POST http://localhost:5000/refresh \
   -H "Content-Type: application/json" \
   -d '{"max_scroll": 50}'
 ```
@@ -211,7 +211,7 @@ python main.py --debug login
 **API Debug Mode:**
 ```bash
 # Start download with debug enabled via API
-curl -X POST http://localhost:5000/api/download \
+curl -X POST http://localhost:5000/download \
   -H "Content-Type: application/json" \
   -d '{"debug": true}'
 ```
