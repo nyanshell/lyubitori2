@@ -31,6 +31,14 @@ BACKUP_CODE=your_2fa_backup_code(optional, if you want use login with backup cod
 
 ### Quick Start
 
+#### Run remote Chrome
+
+```bash
+chromedriver --allowed-ips=LIST_OF_IPS
+```
+
+#### Basic Commands
+
 ```bash
 # Check configuration and status
 python main.py status
