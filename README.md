@@ -159,20 +159,6 @@ lyubitori2/
 └── logs/                    # Application logs (auto-created)
 ```
 
-## Legacy Usage (preserved)
-
-The original interactive mode is still available:
-
-```bash
-dotenv run ipython -i run.py
-```
-
-```python
-In [1]: twitter_login()
-In [2]: driver.get("https://x.com/<username>/likes") 
-In [3]: scroll_download(max_scroll=500)
-```
-
 ## Development
 
 ### Code Quality
